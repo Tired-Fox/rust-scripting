@@ -1,0 +1,5 @@
+cargo:rerun-if-changed=build
+cargo:rustc-link-search=native=D:\Repo\Rust\scripting\crates\lua\target\debug\build\mlua-sys-6464894bd5654e57\out\lua-build\lib
+cargo:rustc-link-lib=static=lua5.4
+cargo:include=D:\Repo\Rust\scripting\crates\lua\target\debug\build\mlua-sys-6464894bd5654e57\out\lua-build\include
+cargo:lib=D:\Repo\Rust\scripting\crates\lua\target\debug\build\mlua-sys-6464894bd5654e57\out\lua-build\lib

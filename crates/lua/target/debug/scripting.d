@@ -1,1 +1,1 @@
-D:\Repo\Rust\scripting\crates\lua\target\debug\scripting.exe: D:\Repo\Rust\scripting\crates\lua\src\main.rs
+D:\Repo\Rust\scripting\crates\lua\target\debug\scripting.exe: D:\Repo\Rust\scripting\crates\lua\build.rs D:\Repo\Rust\scripting\crates\lua\examples/lua/ D:\Repo\Rust\scripting\crates\lua\lua/ D:\Repo\Rust\scripting\crates\lua\src\main.rs

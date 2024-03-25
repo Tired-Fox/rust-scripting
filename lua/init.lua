@@ -4,7 +4,7 @@ local _, err = pcall(plugins.new_plugin, {
     author = "Tired Fox",
     description = "Test plugin to use for testing lua state",
     setup = function (info)
-        print(string.format("[SETUP] %s %s by %s\n  %s", info.name, info.version, info.author, info.description))
+        print(string.format("%s %s by %s\n  %s", info.name, info.version, info.author, info.description))
     end,
 })
 
@@ -13,7 +13,7 @@ if err then
 end
 
 -- Globally provided pprint where rust code will pretty print and format what is passed in, including tables.
-pprint(plugins.PLUGINS[1])
+pretty.print(plugins.plugins[1])
 
 plugins.new_plugin {
     name = "something",

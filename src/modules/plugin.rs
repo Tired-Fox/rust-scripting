@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use mlua::{FromLua, Function, IntoLua, Lua, LuaSerdeExt, Table, Value};
 use mlua::prelude::{LuaError, LuaString};
 
-use crate::Import;
+use super::Import;
 
 /// This object is only constructed from lua tables.
 /// it is used for parsing/validating tables for plugins along
@@ -74,11 +74,12 @@ fn new_plugin(lua: &Lua, data: Value) -> Result<(), LuaError> {
     let plugin = Plugin::from_lua(data.clone(), lua)?;
 
     // Call any hooks for setup
+    log::info!("[LUA] Adding plugin {}", plugin.name);
     if let Some(setup) = plugin.hooks.get("setup") {
         setup.call(plugin.info(lua)?)?;
     }
 
-    let plugins = Plugins::module(lua)?.get::<_, Table>("PLUGINS")?;
+    let plugins = Plugins::module(lua)?.get::<_, Table>("plugins")?;
     plugins.set(plugins.raw_len() + 1, plugin)?;
 
     Ok(())
@@ -88,7 +89,7 @@ pub struct Plugins;
 
 impl Plugins {
     pub fn get_plugins(lua: &Lua) -> Result<Vec<Plugin>, LuaError> {
-        Vec::<Plugin>::from_lua(Plugins::module(lua)?.get("PLUGINS")?, lua)
+        Vec::<Plugin>::from_lua(Plugins::module(lua)?.get("plugins")?, lua)
     }
 }
 
@@ -100,7 +101,7 @@ impl Import for Plugins {
     fn import(lua: &Lua) -> Result<Table, LuaError> {
         let table = lua.create_table()?;
 
-        table.set("PLUGINS", lua.create_table()?)?;
+        table.set("plugins", lua.create_table()?)?;
         table.set("new_plugin", lua.create_function(new_plugin)?)?;
 
         Ok(table)

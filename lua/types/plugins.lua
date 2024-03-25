@@ -18,7 +18,7 @@ Plugin = {}
 
 --- Module for adding plugins
 --- @class plugins
---- @field PLUGINS Plugin[]
+--- @field plugins Plugin[]
 plugins = {}
 
 --- Add a new plugin

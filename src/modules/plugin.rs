@@ -74,7 +74,7 @@ fn new_plugin(lua: &Lua, data: Value) -> Result<(), LuaError> {
     let plugin = Plugin::from_lua(data.clone(), lua)?;
 
     // Call any hooks for setup
-    log::info!("[LUA] Adding plugin {}", plugin.name);
+    log::info!("[\x1b[36mLUA\x1b[39m] Adding plugin {}", plugin.name);
     if let Some(setup) = plugin.hooks.get("setup") {
         setup.call(plugin.info(lua)?)?;
     }

@@ -1,24 +1,12 @@
 extern crate slua;
 
 use mlua::Lua;
-
 use slua::{
     modules::{Plugins, Prettify},
     prelude::*,
 };
 
-macro_rules! set_global {
-    ($lua: ident, function $name: ident ($($arg: ident: $atype: ty)* ) { $($body: tt)* }) => {
-        $lua.globals().set(stringify!($name), $lua.create_function(|lua: &mlua::Lua, ( $($arg)* ): ( $($atype)* )| { $($body)* })?)?;
-    };
-    ($lua: ident, function $name: ident) => {
-        $lua.globals().set(stringify!($name), $lua.create_function($name)?)?;
-    };
-}
-
-
-#[tokio::main]
-async fn main() -> color_eyre::Result<()> {
+fn main() -> color_eyre::Result<()> {
     env_logger::init();
 
     let lua = Lua::new();
@@ -31,7 +19,7 @@ async fn main() -> color_eyre::Result<()> {
     // actions based the state.
     lua.load("require 'init'").eval()?;
 
-    log::info!("[RUST] Loading plugins");
+    log::info!("[\x1b[31mRUST\x1b[39m] Loading plugins");
     let plugins = Plugins::get_plugins(&lua)?;
     for plugin in plugins.iter() {
         println!(

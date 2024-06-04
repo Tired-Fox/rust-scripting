@@ -23,4 +23,5 @@ plugins = {}
 
 --- Add a new plugin
 --- @param plugin Plugin
-function plugins.new_plugin(plugin)end
+function plugins.new_plugin(plugin) end
+

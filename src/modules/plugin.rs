@@ -88,6 +88,10 @@ fn new_plugin(lua: &Lua, data: Value) -> Result<(), LuaError> {
 pub struct Plugins;
 
 impl Plugins {
+    pub fn module(lua: &Lua) -> Result<Table<'_>, LuaError> {
+        lua.globals().get::<_, Table>("plugins")
+    }
+
     pub fn get_plugins(lua: &Lua) -> Result<Vec<Plugin>, LuaError> {
         Vec::<Plugin>::from_lua(Plugins::module(lua)?.get("plugins")?, lua)
     }
@@ -98,12 +102,9 @@ impl Import for Plugins {
         "plugins"
     }
 
-    fn import(lua: &Lua) -> Result<Table, LuaError> {
-        let table = lua.create_table()?;
-
+    fn extend(table: &Table<'_>, lua: &Lua) -> Result<(), LuaError> {
         table.set("plugins", lua.create_table()?)?;
         table.set("new_plugin", lua.create_function(new_plugin)?)?;
-
-        Ok(table)
+        Ok(())
     }
 }

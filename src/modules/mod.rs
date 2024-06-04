@@ -1,35 +1,28 @@
 mod plugin;
 mod prettify;
 
-use mlua::{Error as LuaError, Lua, String as LuaString, Table};
+use mlua::{Error as LuaError, Lua, Table};
 pub use plugin::Plugins;
-pub use prettify::Prettify;
+pub use prettify::{Prettify, pformat};
 
 pub trait Import {
+    /// The name of the module
     fn module_name() -> &'static str;
-    fn import(lua: &Lua) -> Result<Table, LuaError>;
+    
+    /// Extend an existing table with the modules contents
+    fn extend(table: &Table, lua: &Lua) -> Result<(), LuaError>;
 
-    fn module(lua: &Lua) -> Result<Table, LuaError> {
-        let module = lua.globals().get::<_, Table>(Self::module_name())?;
-        match module.get_metatable() {
-            Some(meta) => {
-                if let Ok(name) = meta.get::<_, LuaString>("__metatable") {
-                    if Self::module_name() == name.to_str()? {
-                        return Ok(module);
-                    }
-                }
-            }
-            _ => {}
-        }
-        Err(LuaError::RuntimeError(format!(
-            "Global module {} has been overriden and can no longer be accessed. This value is not meant to be overriden.",
-            Self::module_name()
-        )))
+    /// Create the module and return it (Import)
+    fn import(lua: &Lua) -> Result<Table, LuaError> {
+        let table = lua.create_table()?;
+        Self::extend(&table, lua)?;
+        Ok(table)
     }
 }
 
 pub trait Require {
     fn require<I: Import>(&self) -> Result<(), LuaError>;
+    fn import<S: AsRef<str>>(&self, name: S, module: Table<'_>) -> Result<(), LuaError>;
 }
 
 impl Require for Lua {
@@ -48,5 +41,10 @@ impl Require for Lua {
             }
         }
         self.globals().set(I::module_name(), table)
+    }
+
+    fn import<S: AsRef<str>>(&self, name: S, module: Table<'_>) -> Result<(), LuaError> {
+        self.globals().set(name.as_ref(), module)?;
+        Ok(())
     }
 }

@@ -2,7 +2,7 @@ extern crate slua;
 
 use mlua::Lua;
 use slua::{
-    modules::{Plugins, Prettify},
+    modules::{Plugins, Prettify, config::Config},
     prelude::*, LuaExt,
     lua as _lua
 };
@@ -17,20 +17,26 @@ fn main() -> color_eyre::Result<()> {
         "D:/Repo/Rust/scripting/lua/?/init.lua",
     ]);
 
-    _lua::print!(_lua::module! { [lua]
-        "print" => Prettify::pprint,
-    });
-
     lua.require::<Plugins>()?;
     lua.import("v", _lua::module! { [lua]
         "print" => Prettify::pprint,
     })?;
+
+    let _ = _lua::array! { [lua]
+        Config::default(),
+    };
+
+    lua.globals().set("config", Config::default())?;
 
     // Load init.lua file. The init file and all requires should be using provided functions
     // to load and manipulate lua state. Then the rust side will read that state and execute
     // actions based the state.
     log::info!("[\x1b[31mRUST\x1b[39m] Loading init.lua");
     lua.load("require 'init'").eval()?;
+
+    _lua::print!(
+        lua.globals().get::<_, Config>("config").unwrap(),
+    );
 
     log::info!("[\x1b[31mRUST\x1b[39m] Loading plugins");
     let plugins = Plugins::get_plugins(&lua)?;

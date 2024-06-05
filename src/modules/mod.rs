@@ -1,5 +1,6 @@
 mod plugin;
 mod prettify;
+pub mod config;
 
 use mlua::{Error as LuaError, Lua, Table};
 pub use plugin::Plugins;

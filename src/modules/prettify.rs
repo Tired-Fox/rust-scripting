@@ -1,4 +1,4 @@
-use mlua::{Error as LuaError, Integer, Lua, Table, Value, Variadic};
+use mlua::{Error as LuaError, Function, Integer, Lua, Table, Value, Variadic};
 
 use super::Import;
 
@@ -38,7 +38,14 @@ pub fn pformat(arg: &Value, indent: usize) -> Result<String, LuaError> {
             )
         }
         Value::Thread(_) => "Thread".into(),
-        Value::UserData(_) => "Any".into(),
+        Value::UserData(data) => {
+            let meta = data.get_metatable()?;
+            if meta.contains("__tostring")? {
+                meta.get::<Function<'_>>("__tostring")?.call((data, true))?
+            } else {
+                meta.get::<String>("__name")?
+            }
+        },
         Value::Error(e) => format!("{}", e),
     })
 }

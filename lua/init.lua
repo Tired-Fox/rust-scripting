@@ -1,3 +1,12 @@
+print(config)
+config.paths = {
+	projects = "D:/Repo",
+	download = "D:/Downloads",
+	build = "D:/Repo/test-project/build",
+}
+config.features.show_docker_logs = true
+require("nested")
+
 local _, err = pcall(plugins.new_plugin, {
 	name = "test-plugin",
 	version = "0.1.0",

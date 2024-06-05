@@ -1,5 +1,9 @@
+use std::fmt::Display;
+use std::path::PathBuf;
+
 use mlua::FromLuaMulti;
 use mlua::Function;
+use mlua::IntoLua;
 use mlua::IntoLuaMulti;
 use mlua::Lua;
 use mlua::Table;
@@ -9,11 +13,12 @@ use crate::modules::pformat;
 use crate::modules::Import;
 
 pub use crate::lua_print as print;
-pub use crate::lua_module as module;
-
+pub use crate::lua_table as module;
+pub use crate::lua_table as table;
+pub use crate::lua_array as array;
 
 pub trait IntoLuaEntry<'lua, R, L = ()> {
-    fn into_lua_entry(self, lua: &'lua Lua) -> Result<R, mlua::Error>;
+    fn into_lua_entry(self, lua: &'lua Lua) -> Result<mlua::Value<'lua>, mlua::Error>;
 }
 
 impl<'lua, A, R, F> IntoLuaEntry<'lua, Function<'lua>, (A, R)> for F
@@ -22,39 +27,87 @@ where
     R: IntoLuaMulti<'lua>,
     F: Fn(&'lua Lua, A) -> Result<R, mlua::Error> + Send + 'static,
 {
-    fn into_lua_entry(self, lua: &'lua Lua) -> Result<Function<'lua>, mlua::Error> {
-       lua.create_function(self) 
+    fn into_lua_entry(self, lua: &'lua Lua) -> Result<mlua::Value<'lua>, mlua::Error> {
+       Ok(mlua::Value::Function(lua.create_function(self)?))
     }
 }
 
 impl<'lua, I: Import> IntoLuaEntry<'lua, Table<'lua>, ()> for I {
-    fn into_lua_entry(self, _lua: &'lua Lua) -> Result<Table<'lua>, mlua::Error> {
-        I::import(_lua)
+    fn into_lua_entry(self, _lua: &'lua Lua) -> Result<mlua::Value<'lua>, mlua::Error> {
+        Ok(mlua::Value::Table(I::import(_lua)?))
+    }
+}
+
+impl<'lua, I: IntoLua<'lua>> IntoLuaEntry<'lua, I, ()> for I {
+    fn into_lua_entry(self, lua: &'lua Lua) -> Result<mlua::Value<'lua>, mlua::Error> {
+        self.into_lua(lua)
     }
 }
 
 #[macro_export]
-macro_rules! lua_module {
+macro_rules! lua_table {
     {
         [$lua: ident] $($name: expr => $value: expr),* $(,)?
     } => {
         {
             use $crate::lua::IntoLuaEntry;
-            let _m = $lua.create_table()?;
-            $($crate::lua_module!{@-- ($lua, _m), $name: $value};)*
-            Ok::<mlua::Table<'_>, mlua::Error>(_m)
+            $lua.create_table_from([$(
+                ($name.to_string(), ($value).into_lua_entry(&$lua)?)
+            )*])
         }?
     };
-    {@-- ($lua: ident, $m: ident), $name: literal: $value: expr} => {
-        $m.set($name, ($value).into_lua_entry(&$lua)?)?
-    };
-    {@-- ($lua: ident, $m: ident), $name: ident: $value: expr} => {
-        $m.set(stringify!($name), ($value).into_lua_entry(&$lua)?)?
+}
+
+#[macro_export]
+macro_rules! lua_array {
+    {
+        [$lua: ident] $($value: expr),* $(,)?
+    } => {
+        {
+            use $crate::lua::IntoLuaEntry;
+            $lua.create_table_from([$(
+                ($value).into_lua_entry(&$lua)?
+            )*].iter().enumerate().map(|(i, v)| (i + 1, v)))
+        }?
     };
 }
 
 pub trait LuaPrint<'a> {
     fn printable_value(&self) -> Result<String, LuaError>;
+}
+
+pub trait LuaFmt<'a> {
+    fn lua_fmt(&self, pretty: bool, indent: usize) -> String;
+}
+
+impl<'a, F: LuaFmt<'a>> LuaFmt<'a> for &F {
+    fn lua_fmt(&self, pretty: bool, indent: usize) -> String {
+        (*self).lua_fmt(pretty, indent)
+    }
+}
+
+impl<'a> LuaFmt<'a> for String {
+    fn lua_fmt(&self, _: bool, _: usize) -> String {
+        format!("\"{}\"", self)
+    }
+}
+
+impl<'a> LuaFmt<'a> for &'a str {
+    fn lua_fmt(&self, _: bool, _: usize) -> String {
+        format!("\"{}\"", self)
+    }
+}
+
+impl<'a> LuaFmt<'a> for bool {
+    fn lua_fmt(&self, _: bool, _: usize) -> String {
+        self.to_string()
+    }
+}
+
+impl<'a> LuaFmt<'a> for PathBuf {
+    fn lua_fmt(&self, _: bool, _: usize) -> String {
+        format!("\"{}\"", self.display())
+    }
 }
 
 impl<'a> LuaPrint<'a> for mlua::Value<'a> {
@@ -69,11 +122,6 @@ impl<'a> LuaPrint<'a> for mlua::Table<'a> {
     }
 }
 
-impl<'a> LuaPrint<'a> for bool {
-    fn printable_value(&self) -> Result<String, LuaError> {
-        pformat(&mlua::Value::Boolean(*self), 0)
-    }
-}
 impl<'a> LuaPrint<'a> for mlua::Function<'a> {
     fn printable_value(&self) -> Result<String, LuaError> {
         pformat(&mlua::Value::Function(self.clone()), 0)
@@ -109,18 +157,24 @@ impl<'a> LuaPrint<'a> for mlua::Number {
     }
 }
 
-impl<'a, T: ToString> LuaPrint<'a> for Option<T> {
+impl<'a, T: Display> LuaPrint<'a> for Option<T> {
     fn printable_value(&self) -> Result<String, LuaError> {
         match self {
-            Some(v) => Ok(v.to_string()),
+            Some(v) => Ok(format!("{:#}", v)),
             None => pformat(&mlua::Value::Nil, 0),
         }
     }
 }
 
+impl <'a, T: LuaFmt<'a>> LuaPrint<'a> for T {
+    fn printable_value(&self) -> Result<String, LuaError> {
+        Ok(self.lua_fmt(true, 0))
+    }
+}
+
 #[macro_export]
 macro_rules! lua_print {
-    ($($arg: expr),*) => {
+    ($($arg: expr),* $(,)?) => {
         {
             use $crate::lua::LuaPrint;
             println!("{}", vec![
@@ -128,4 +182,33 @@ macro_rules! lua_print {
             ].join(" "))
         }
     };
+}
+
+pub struct LuaStructFormat {
+    _s: Vec<(String, String)>,
+    pretty: bool,
+    indent: usize,
+}
+
+impl LuaStructFormat {
+    pub fn new(pretty: bool, indent: usize) -> Self {
+        Self { _s: Vec::new(), pretty, indent }
+    }
+
+    pub fn field<'lua, T: LuaFmt<'lua>, S: AsRef<str>>(mut self, name: S, format: T) -> Self {
+        self._s.push((name.as_ref().to_string(), format.lua_fmt(self.pretty, self.indent+1)));
+        self
+    }
+}
+
+impl Display for LuaStructFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let offset = (0..self.indent).map(|_| "  ").collect::<String>();
+        let nl = if self.pretty { format!("\n{offset}") } else { String::from(" ") };
+        let spacing = if self.pretty { "  " } else { "" };
+        write!(f, 
+            "{{{nl}{spacing}{}{nl}}}",
+            self._s.iter().map(|(k, v)| format!("{k} = {v}")).collect::<Vec<String>>().join(format!(",{nl}{spacing}").as_str()),
+        )
+    }
 }

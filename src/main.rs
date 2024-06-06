@@ -20,13 +20,16 @@ fn main() -> color_eyre::Result<()> {
     lua.require::<Plugins>()?;
     lua.import("v", _lua::module! { [lua]
         "print" => Prettify::pprint,
-    })?;
+    }?)?;
 
     let _ = _lua::array! { [lua]
         Config::default(),
     };
 
     lua.globals().set("config", Config::default())?;
+
+    log::info!("[\x1b[31mRUST\x1b[39m] Loading provided.lua");
+    lua.load("require 'types.provided'").eval()?;
 
     // Load init.lua file. The init file and all requires should be using provided functions
     // to load and manipulate lua state. Then the rust side will read that state and execute

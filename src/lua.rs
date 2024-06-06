@@ -16,6 +16,10 @@ pub use crate::lua_print as print;
 pub use crate::lua_table as module;
 pub use crate::lua_table as table;
 pub use crate::lua_array as array;
+pub use crate::lua_multi as multi;
+pub use crate::lua_pairs as __pairs;
+
+pub const NIL: mlua::Value = mlua::Value::Nil;
 
 pub trait IntoLuaEntry<'lua, R, L = ()> {
     fn into_lua_entry(self, lua: &'lua Lua) -> Result<mlua::Value<'lua>, mlua::Error>;
@@ -45,6 +49,17 @@ impl<'lua, I: IntoLua<'lua>> IntoLuaEntry<'lua, I, ()> for I {
 }
 
 #[macro_export]
+macro_rules! lua_multi {
+    {
+        [$lua: ident] $($value: expr),* $(,)?
+    } => {
+        mlua::MultiValue::from_vec(vec![
+            $($value.into_lua($lua)?,)*    
+        ])
+    };
+}
+
+#[macro_export]
 macro_rules! lua_table {
     {
         [$lua: ident] $($name: expr => $value: expr),* $(,)?
@@ -52,9 +67,9 @@ macro_rules! lua_table {
         {
             use $crate::lua::IntoLuaEntry;
             $lua.create_table_from([$(
-                ($name.to_string(), ($value).into_lua_entry(&$lua)?)
+                ($name.to_string(), ($value).into_lua_entry(&$lua)?),
             )*])
-        }?
+        }
     };
 }
 
@@ -211,4 +226,31 @@ impl Display for LuaStructFormat {
             self._s.iter().map(|(k, v)| format!("{k} = {v}")).collect::<Vec<String>>().join(format!(",{nl}{spacing}").as_str()),
         )
     }
+}
+
+#[macro_export]
+macro_rules! lua_pairs {
+    {
+        pub fn $methods: ident ::__pairs ($this: ident, key$(,$($arg: ident: $arg_type: ty),* $(,)?)?) {
+            match key {
+                None => ($next_key: expr, $next_value: expr),
+                $($k: literal => ($nk: expr, $nv: expr)),*
+                $(,)?
+            }
+        }
+    } => {
+        $methods.add_meta_method(mlua::MetaMethod::Pairs, |lua, this, ($($($arg,)*)?): ($($($arg_type)*)?)| {
+            Ok($crate::lua::multi! { [lua]
+                lua.create_function(|lua, ($this, key): (Self, Option<String>)| {
+                    match key.as_deref() {
+                        None => Ok($crate::lua::multi! { [lua] $next_key, $next_value }),
+                        $(Some($k) => Ok($crate::lua::multi! { [lua] $nk, $nv }),)*
+                        _ => Ok(_lua::multi! { [lua] mlua::Value::Nil, mlua::Value::Nil }),
+                    }
+                })?,
+                this.clone(),
+                mlua::Value::Nil,
+            })
+        });
+    };
 }

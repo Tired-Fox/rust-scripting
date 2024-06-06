@@ -1,9 +1,9 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 
-use mlua::{FromLua, Lua, MetaMethod, UserData, UserDataFields};
+use mlua::{FromLua, IntoLua, Lua, MetaMethod, UserData, UserDataFields};
 use serde::ser::Error;
 
-use crate::lua::{LuaFmt, LuaStructFormat};
+use crate::lua::{self as _lua, LuaFmt, LuaStructFormat};
 
 
 #[derive(Debug, Clone, Default)]
@@ -48,7 +48,17 @@ impl UserData for Paths {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method(MetaMethod::ToString, |_, this, pretty: Option<bool>| {
             Ok(this.lua_fmt(pretty.unwrap_or(false), 0))
-        })
+        });
+
+        _lua::__pairs! {
+            pub fn methods::__pairs(this, key) {
+                match key {
+                    None => ("projects", this.projects.display().to_string()),
+                    "projects" => ("download", this.download.display().to_string()),
+                    "download" => ("build", this.build.display().to_string()),
+                }
+            }
+        }
     }
 
     fn add_fields<'lua, F: UserDataFields<'lua, Self>>(fields: &mut F) {
@@ -104,7 +114,15 @@ impl UserData for Features {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method(MetaMethod::ToString, |_, this, pretty: Option<bool>| {
             Ok(this.lua_fmt(pretty.unwrap_or(false), 0))
-        })
+        });
+
+        _lua::__pairs! {
+            pub fn methods::__pairs(this, key) {
+                match key {
+                    None => ("show_docker_logs", this.show_docker_logs),
+                }
+            }
+        }
     }
 
     fn add_fields<'lua, F: UserDataFields<'lua, Self>>(fields: &mut F) {
@@ -163,7 +181,16 @@ impl UserData for Config {
     fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method(MetaMethod::ToString, |_, this, pretty: Option<bool>| {
             Ok(this.lua_fmt(pretty.unwrap_or(false), 0))
-        })
+        });
+
+        _lua::__pairs! {
+            pub fn methods::__pairs(this, key) {
+                match key {
+                    None => ("paths", this.paths.clone()),
+                    "paths" => ("features", this.features.clone()),
+                }
+            }
+        }
     }
 
     fn add_fields<'lua, F: UserDataFields<'lua, Self>>(fields: &mut F) {
